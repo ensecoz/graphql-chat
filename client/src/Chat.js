@@ -1,43 +1,42 @@
-import React, { Component } from 'react';
-import { addMessage, getMessages, onMessageAdded } from './graphql/queries';
+import React from 'react';
+import { useQuery, useMutation, useSubscription } from '@apollo/react-hooks';
+import { addMessageMutation, messagesQuery, messageAddedSubscription } from './graphql/queries';
 import MessageInput from './MessageInput';
 import MessageList from './MessageList';
 
-class Chat extends Component {
-  state = {messages: []};
-  subscription = null;
 
-  async componentDidMount() {
-    const messages = await getMessages();
-    this.setState({messages});
-    this.subscription = onMessageAdded((message) => {
-      this.setState({messages: this.state.messages.concat(message)});
-    })
-  }
+function Chat({user}) { 
 
-  componentWillUnmount() {
-    if (this.subscription) {
-      this.subscription.unsubscribe();
+  const {data} = useQuery(messagesQuery);
+  const messages = data ? data.messages : [];
+
+  const [addMessage] = useMutation(addMessageMutation);
+
+  useSubscription(messageAddedSubscription, {
+    onSubscriptionData: ({client, subscriptionData}) => {
+      client.writeData({data: {
+        messages: messages.concat(subscriptionData.data.messageAdded)
+      }});
     }
-  }
-  
-  async handleSend(text) {
-    await addMessage(text);
-  }
+  });
 
-  render() {
-    const {user} = this.props;
-    const {messages} = this.state;
-    return (
-      <section className="section">
-        <div className="container">
-          <h1 className="title">Chatting as {user}</h1>
-          <MessageList user={user} messages={messages} />
-          <MessageInput onSend={this.handleSend.bind(this)} />
-        </div>
-      </section>
-    );
-  }  
+  // const [messages, setMessages] = useState([]);
+
+  const handleSend = async (text) => {
+      // const message = {id: text, from : 'you', text};
+      // setMessages(messages.concat(message));
+      await addMessage({variables: {input: {text}}});
+  };
+
+  return (
+    <section className="section">
+      <div className="container">
+        <h1 className="title">Chatting as {user}</h1>
+        <MessageList user={user} messages={messages} />
+        <MessageInput onSend={handleSend} />
+      </div>
+    </section>
+  );
 }
 
 export default Chat;
